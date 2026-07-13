@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 
+import { AdminPanel } from './components/AdminPanel'
+import { AnalysisTrend } from './components/AnalysisTrend'
 import { AuthForm } from './components/AuthForm'
-import { getCurrentUser, loginUser, registerUser } from './lib/api'
+import { DashboardMetrics } from './components/DashboardMetrics'
+import { EmailAnalysisForm } from './components/EmailAnalysisForm'
+import { HistoryList } from './components/HistoryList'
+import { ReportButton } from './components/ReportButton'
+import { RiskDistributionChart } from './components/RiskDistributionChart'
+import { analyzeEmail, downloadReport, getCurrentUser, getHistory, loginUser, registerUser } from './lib/api'
 
 interface UserProfile {
   id: number
@@ -14,6 +21,19 @@ function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('bluephish_token'))
   const [user, setUser] = useState<UserProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<{
+    subject?: string
+    from?: string
+    to?: string
+    score?: number
+    risk_level?: string
+    summary?: string
+    indicators?: Array<{ detail: string }>
+    urls?: string[]
+  } | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [history, setHistory] = useState<Array<{ id: number; created_at: string; subject: string; score: number; risk_level: string; summary: string }>>([])
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false)
 
   useEffect(() => {
     const loadUser = async () => {
@@ -28,6 +48,20 @@ function App() {
     }
 
     void loadUser()
+  }, [token])
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!token) return
+      try {
+        const entries = await getHistory(token)
+        setHistory(entries)
+      } catch {
+        setHistory([])
+      }
+    }
+
+    void loadHistory()
   }, [token])
 
   const handleSubmit = async (payload: { name?: string; email: string; password: string }) => {
@@ -57,6 +91,31 @@ function App() {
     localStorage.removeItem('bluephish_token')
     setToken(null)
     setUser(null)
+  }
+
+  const handleDownloadReport = async () => {
+    if (!token || !analysisResult) return
+    setIsDownloadingReport(true)
+    try {
+      await downloadReport(token, analysisResult.subject ? `Subject: ${analysisResult.subject}\nFrom: ${analysisResult.from || ''}\nTo: ${analysisResult.to || ''}\n\n${analysisResult.summary || ''}` : '')
+    } finally {
+      setIsDownloadingReport(false)
+    }
+  }
+
+  const handleAnalyze = async (rawEmail: string, file?: File | null) => {
+    if (!token) return
+    setIsAnalyzing(true)
+    try {
+      const result = await analyzeEmail(token, rawEmail, file)
+      setAnalysisResult(result)
+      const entries = await getHistory(token)
+      setHistory(entries)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo analizar el correo')
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   return (
@@ -98,17 +157,37 @@ function App() {
               </button>
             </div>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {[
-                { label: 'Correos analizados', value: '0' },
-                { label: 'Riesgo promedio', value: '—' },
-                { label: 'Alertas recientes', value: '0' },
-              ].map((item) => (
-                <div key={item.label} className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                  <p className="text-sm text-slate-400">{item.label}</p>
-                  <p className="mt-2 text-3xl font-semibold text-white">{item.value}</p>
-                </div>
-              ))}
+            <div className="mt-8">
+              <DashboardMetrics entries={history} />
+            </div>
+
+            <div className="mt-8 grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <AnalysisTrend entries={history} />
+              </div>
+              <div>
+                <RiskDistributionChart entries={history} />
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="mb-4 flex justify-end">
+                <ReportButton onDownload={handleDownloadReport} isLoading={isDownloadingReport} />
+              </div>
+              <EmailAnalysisForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} result={analysisResult} />
+            </div>
+
+            <div className="mt-8 grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <HistoryList entries={history} />
+              </div>
+              <div>
+                <RiskDistributionChart entries={history} />
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <AdminPanel token={token} />
             </div>
           </section>
         )}

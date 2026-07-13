@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/adminpanel.tsx","./src/components/analysistrend.tsx","./src/components/authform.tsx","./src/components/dashboardmetrics.tsx","./src/components/emailanalysisform.tsx","./src/components/historylist.tsx","./src/components/reportbutton.tsx","./src/components/riskdistributionchart.tsx","./src/lib/api.ts"],"version":"5.9.3"}
