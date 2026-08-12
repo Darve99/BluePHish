@@ -23,21 +23,20 @@ export function AuthForm({ mode, onSubmit, error }: AuthFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+    <form onSubmit={handleSubmit} className="space-y-6 rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_30px_60px_rgba(15,23,42,0.08)]">
       <div>
-        <h2 className="text-xl font-semibold text-white">
-          {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-        </h2>
-        <p className="mt-1 text-sm text-slate-400">
-          {mode === 'login' ? 'Accede a tu panel de análisis' : 'Regístrate para empezar a analizar correos'}
+        <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Acceso seguro</p>
+        <h2 className="mt-2 text-3xl font-semibold text-slate-950">{mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          {mode === 'login' ? 'Ingresa para consultar tu historial y revisar correos.' : 'Regístrate para comenzar a proteger tu bandeja de entrada.'}
         </p>
       </div>
 
       {mode === 'register' && (
-        <label className="block text-sm text-slate-300">
-          <span className="mb-1 block">Nombre</span>
+        <label className="block text-sm text-slate-700">
+          <span className="mb-2 block text-slate-900">Nombre</span>
           <input
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-0"
+            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
             value={name}
             onChange={(event) => setName(event.target.value)}
             required
@@ -45,34 +44,34 @@ export function AuthForm({ mode, onSubmit, error }: AuthFormProps) {
         </label>
       )}
 
-      <label className="block text-sm text-slate-300">
-        <span className="mb-1 block">Correo</span>
+      <label className="block text-sm text-slate-700">
+        <span className="mb-2 block text-slate-900">Correo</span>
         <input
           type="email"
-          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-0"
+          className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
         />
       </label>
 
-      <label className="block text-sm text-slate-300">
-        <span className="mb-1 block">Contraseña</span>
+      <label className="block text-sm text-slate-700">
+        <span className="mb-2 block text-slate-900">Contraseña</span>
         <input
           type="password"
-          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none ring-0"
+          className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
         />
       </label>
 
-      {error && <p className="text-sm text-rose-400">{error}</p>}
+      {error && <p className="text-sm text-rose-500">{error}</p>}
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-lg bg-cyan-500 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
+        className="w-full rounded-full bg-sky-600 px-5 py-3 text-base font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isSubmitting ? 'Procesando...' : mode === 'login' ? 'Entrar' : 'Registrarme'}
       </button>

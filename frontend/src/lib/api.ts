@@ -40,10 +40,19 @@ export async function getCurrentUser(token: string) {
   })
 }
 
-export async function analyzeEmail(token: string, rawEmail: string, file?: File | null) {
+export async function analyzeEmail(
+  token: string,
+  rawEmail: string,
+  file?: File | null,
+  subject?: string,
+  hasAttachment?: boolean
+) {
   if (file) {
     const formData = new FormData()
     formData.append('file', file)
+    if (subject) formData.append('subject', subject)
+    if (hasAttachment) formData.append('has_attachment', String(hasAttachment))
+
     const response = await fetch(`${API_BASE_URL}/analysis/upload`, {
       method: 'POST',
       headers: {
@@ -83,6 +92,47 @@ export async function analyzeEmail(token: string, rawEmail: string, file?: File 
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({ raw_email: rawEmail, subject: subject || undefined, has_attachment: !!hasAttachment }),
+  })
+}
+
+export async function analyzeGuest(rawEmail: string, file?: File | null) {
+  if (file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch(`${API_BASE_URL}/analysis/guest/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      throw new Error(payload.detail || 'No se pudo analizar el archivo')
+    }
+
+    return response.json() as Promise<{
+      subject: string
+      from: string
+      to: string
+      urls: string[]
+      score: number
+      risk_level: string
+      summary: string
+      indicators: Array<{ detail: string }>
+    }>
+  }
+
+  return request<{
+    subject: string
+    from: string
+    to: string
+    urls: string[]
+    score: number
+    risk_level: string
+    summary: string
+    indicators: Array<{ detail: string }>
+  }>(`/analysis/guest`, {
+    method: 'POST',
     body: JSON.stringify({ raw_email: rawEmail }),
   })
 }

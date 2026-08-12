@@ -22,6 +22,13 @@ class RuleEngine:
                 "applies": lambda ctx: bool(ctx["sender"]) and any(pattern in ctx["sender"].lower() for pattern in ["no-reply", "support", "security", "admin", "paypal", "microsoft", "google", "amazon", "banco", "seguridad"]),
             },
             {
+                "id": "generic_greeting",
+                "description": "Saludo genérico en lugar de nombre personal",
+                "weight": 8,
+                "applies": lambda ctx: any(term in ctx["body"].lower() for term in ["hola,"])
+                    and not any(name in ctx["body"].lower() for name in ["estimado", "estimada", "sr.", "sra.", "señor", "señora"]),
+            },
+            {
                 "id": "credential_request",
                 "description": "Se solicitan credenciales (contraseña, usuario, token)",
                 "weight": 35,
@@ -49,6 +56,18 @@ class RuleEngine:
                 "applies": lambda ctx: any(term in ctx["body"].lower() for term in ["verificar", "verify", "reactivar", "reactivate", "confirmar identidad", "validate", "confirm identity"]),
             },
             {
+                "id": "suspicious_action",
+                "description": "Se pide realizar una acción urgente en un enlace",
+                "weight": 18,
+                "applies": lambda ctx: any(term in ctx["body"].lower() for term in ["accede", "ingresa", "haz clic", "click", "abre", "inicia sesión", "login", "restaurar", "actualizar"]),
+            },
+            {
+                "id": "suspicious_url_keyword",
+                "description": "URL contiene palabras típicas de phishing o verificación",
+                "weight": 12,
+                "applies": lambda ctx: any(any(keyword in url.lower() for keyword in ["verify", "secure", "login", "auth", "account", "reactivar", "recuperar"]) for url in ctx["urls"]),
+            },
+            {
                 "id": "many_urls",
                 "description": "Se detectaron múltiples enlaces",
                 "weight": 10,
@@ -71,6 +90,14 @@ class RuleEngine:
                 "description": "Se detectó referencia a adjunto o ejecutable",
                 "weight": 20,
                 "applies": lambda ctx: "attachment" in ctx["body"].lower() or "exe" in ctx["body"].lower() or ".zip" in ctx["body"].lower(),
+            },
+            {
+                "id": "missing_auth_results",
+                "description": "No se encuentran cabeceras de autenticación claras",
+                "weight": 6,
+                "applies": lambda ctx: ctx.get("spf") == "neutral" and ctx.get("dkim") == "neutral" and ctx.get("dmarc") == "neutral" and (
+                    bool(ctx["urls"]) or bool(ctx.get("terms"))
+                ),
             },
             {
                 "id": "spf_fail",
@@ -202,12 +229,16 @@ class EmailAnalyzer:
             return "high"
         if score >= 40:
             return "medium"
+        if score == 0:
+            return "none"
         return "low"
 
     def _build_summary(self, score: int, rule_hits: list[dict[str, Any]], suspicious_terms: list[str]) -> str:
         base = f"Puntuación de riesgo: {score}/100."
         if rule_hits:
             base += f" Indicadores: {', '.join(item['description'] for item in rule_hits[:3])}."
+        else:
+            base += " Sin indicadores sospechosos detectados."
         if suspicious_terms:
             base += f" Términos sospechosos detectados: {', '.join(suspicious_terms)}."
         return base

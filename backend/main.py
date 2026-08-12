@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -82,6 +82,8 @@ def refresh_token(payload: RefreshTokenRequest):
 
 class EmailAnalysisRequest(BaseModel):
     raw_email: str
+    subject: Optional[str] = None
+    has_attachment: Optional[bool] = False
 
 
 @app.post("/analysis")
@@ -89,9 +91,33 @@ def analyze_email(payload: EmailAnalysisRequest, current_user: Annotated[User, D
     if analyzer is None or ai_service is None or history_service is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Analysis service unavailable")
     result = analyzer.analyze(payload.raw_email)
+    # prefer provided subject when given
+    if payload.subject:
+        result["subject"] = payload.subject
+    # bump score if user indicated an attachment
+    if payload.has_attachment:
+        result["score"] = min(100, (result.get("score") or 0) + 10)
+        score = result.get("score", 0)
+        result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
     ai_result = ai_service.generate_analysis_summary(result)
     result["ai"] = ai_result
     history_service.add_entry(current_user.email, result)
+    return result
+
+
+@app.post("/analysis/guest")
+def analyze_guest(payload: EmailAnalysisRequest):
+    if analyzer is None or ai_service is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Analysis service unavailable")
+    result = analyzer.analyze(payload.raw_email)
+    if payload.subject:
+        result["subject"] = payload.subject
+    if payload.has_attachment:
+        result["score"] = min(100, (result.get("score") or 0) + 10)
+        score = result.get("score", 0)
+        result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
+    ai_result = ai_service.generate_analysis_summary(result)
+    result["ai"] = ai_result
     return result
 
 
@@ -99,6 +125,8 @@ def analyze_email(payload: EmailAnalysisRequest, current_user: Annotated[User, D
 def upload_email(
     file: Annotated[UploadFile, File(...)],
     current_user: Annotated[User, Depends(get_current_user)],
+    subject: Optional[str] = Form(None),
+    has_attachment: bool = Form(False),
 ):
     if analyzer is None or ai_service is None or history_service is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Analysis service unavailable")
@@ -107,9 +135,39 @@ def upload_email(
 
     content = file.file.read()
     result = analyzer.analyze(content)
+    if subject:
+        result["subject"] = subject
+    if has_attachment:
+        result["score"] = min(100, (result.get("score") or 0) + 10)
+        score = result.get("score", 0)
+        result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
     ai_result = ai_service.generate_analysis_summary(result)
     result["ai"] = ai_result
     history_service.add_entry(current_user.email, result)
+    return result
+
+
+@app.post("/analysis/guest/upload")
+def upload_guest(
+    file: Annotated[UploadFile, File(...)],
+    subject: Optional[str] = Form(None),
+    has_attachment: bool = Form(False),
+):
+    if analyzer is None or ai_service is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Analysis service unavailable")
+    if not file.filename or not file.filename.lower().endswith(".eml"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only .eml files are supported")
+
+    content = file.file.read()
+    result = analyzer.analyze(content)
+    if subject:
+        result["subject"] = subject
+    if has_attachment:
+        result["score"] = min(100, (result.get("score") or 0) + 10)
+        score = result.get("score", 0)
+        result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
+    ai_result = ai_service.generate_analysis_summary(result)
+    result["ai"] = ai_result
     return result
 
 
