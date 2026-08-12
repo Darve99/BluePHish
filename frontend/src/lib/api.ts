@@ -45,12 +45,14 @@ export async function analyzeEmail(
   rawEmail: string,
   file?: File | null,
   subject?: string,
-  hasAttachment?: boolean
+  hasAttachment?: boolean,
+  from?: string
 ) {
   if (file) {
     const formData = new FormData()
     formData.append('file', file)
     if (subject) formData.append('subject', subject)
+    if (from) formData.append('from', from)
     if (hasAttachment) formData.append('has_attachment', String(hasAttachment))
 
     const response = await fetch(`${API_BASE_URL}/analysis/upload`, {
@@ -92,14 +94,16 @@ export async function analyzeEmail(
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ raw_email: rawEmail, subject: subject || undefined, has_attachment: !!hasAttachment }),
+    body: JSON.stringify({ raw_email: rawEmail, subject: subject || undefined, has_attachment: !!hasAttachment, from: from || undefined }),
   })
 }
 
-export async function analyzeGuest(rawEmail: string, file?: File | null) {
+export async function analyzeGuest(rawEmail: string, file?: File | null, from?: string, hasAttachment?: boolean) {
   if (file) {
     const formData = new FormData()
     formData.append('file', file)
+    if (from) formData.append('from', from)
+    if (hasAttachment) formData.append('has_attachment', String(hasAttachment))
     const response = await fetch(`${API_BASE_URL}/analysis/guest/upload`, {
       method: 'POST',
       body: formData,
@@ -133,7 +137,7 @@ export async function analyzeGuest(rawEmail: string, file?: File | null) {
     indicators: Array<{ detail: string }>
   }>(`/analysis/guest`, {
     method: 'POST',
-    body: JSON.stringify({ raw_email: rawEmail }),
+    body: JSON.stringify({ raw_email: rawEmail, from: from || undefined, has_attachment: !!hasAttachment }),
   })
 }
 

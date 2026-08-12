@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, useState } from 'react'
 
 interface EmailAnalysisFormProps {
-  onAnalyze: (rawEmail: string, file?: File | null, subject?: string, hasAttachment?: boolean) => Promise<void>
+  onAnalyze: (rawEmail: string, file?: File | null, subject?: string, hasAttachment?: boolean, from?: string) => Promise<void>
   isLoading?: boolean
   result?: {
     subject?: string
@@ -19,11 +19,12 @@ export function EmailAnalysisForm({ onAnalyze, isLoading = false, result }: Emai
   const [rawEmail, setRawEmail] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [subject, setSubject] = useState('')
+  const [sender, setSender] = useState('')
   const [hasAttachment, setHasAttachment] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    await onAnalyze(rawEmail, selectedFile, subject, hasAttachment)
+    await onAnalyze(rawEmail, selectedFile, subject, hasAttachment, sender)
   }
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -31,7 +32,7 @@ export function EmailAnalysisForm({ onAnalyze, isLoading = false, result }: Emai
     setSelectedFile(file)
     if (file) {
       // uploading a file implies it contains the email; mark attachment true
-      void onAnalyze('', file, '', true)
+      void onAnalyze('', file, '', true, sender)
     }
   }
 
@@ -63,6 +64,16 @@ export function EmailAnalysisForm({ onAnalyze, isLoading = false, result }: Emai
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Asunto del correo"
+          />
+        </label>
+
+        <label className="block text-sm text-slate-700 mt-4">
+          <span className="mb-2 block text-slate-900">Remitente (opcional)</span>
+          <input
+            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+            value={sender}
+            onChange={(e) => setSender(e.target.value)}
+            placeholder="ej. seguridad@empresa.com"
           />
         </label>
 

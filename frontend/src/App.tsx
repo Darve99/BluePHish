@@ -137,25 +137,21 @@ function App() {
     setIsGuest(true)
   }
 
-  const handleAnalyze = async (rawEmail: string, file?: File | null, subject?: string, hasAttachment?: boolean) => {
+  const handleAnalyze = async (rawEmail: string, file?: File | null, subject?: string, hasAttachment?: boolean, from?: string) => {
     setIsAnalyzing(true)
     try {
       if (isGuest) {
-        const result = await (await import('./lib/api')).analyzeGuest(rawEmail, file)
+        const result = await (await import('./lib/api')).analyzeGuest(rawEmail, file, from, hasAttachment)
         // if subject provided, prefer it
         if (subject) result.subject = subject
-        // apply attachment bump locally if provided
-        if (hasAttachment) {
-          result.score = Math.min(100, (result.score || 0) + 10)
-          result.risk_level = result.score >= 70 ? 'high' : result.score >= 30 ? 'medium' : 'low'
-        }
+        if (from) result.from = from
         setAnalysisResult(result)
         return
       }
 
       if (!token) return
 
-      const result = await analyzeEmail(token, rawEmail, file, subject, hasAttachment)
+      const result = await analyzeEmail(token, rawEmail, file, subject, hasAttachment, from)
       setAnalysisResult(result)
       const entries = await getHistory(token)
       setHistory(entries)
