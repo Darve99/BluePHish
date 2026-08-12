@@ -2,7 +2,7 @@ from typing import Annotated, Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.database import Base, engine
 
@@ -84,6 +84,8 @@ class EmailAnalysisRequest(BaseModel):
     raw_email: str
     subject: Optional[str] = None
     has_attachment: Optional[bool] = False
+    # allow client to override detected sender using the JSON key 'from'
+    from_: Optional[str] = Field(None, alias='from')
 
 
 @app.post("/analysis")
@@ -94,14 +96,24 @@ def analyze_email(payload: EmailAnalysisRequest, current_user: Annotated[User, D
     # prefer provided subject when given
     if payload.subject:
         result["subject"] = payload.subject
+    # prefer provided sender override when given
+    if getattr(payload, 'from_', None):
+        result["from"] = payload.from_
     # bump score if user indicated an attachment
     if payload.has_attachment:
-        result["score"] = min(100, (result.get("score") or 0) + 10)
+        result["score"] = min(100, (result.get("score") or 0) + 20)
         score = result.get("score", 0)
         result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
+    # force high risk when credential request + attachment
+    if payload.has_attachment and any(i.get('type') == 'credential_request' for i in result.get('indicators', [])):
+        result['risk_level'] = 'high'
+        result['score'] = max(result.get('score', 0), 70)
     ai_result = ai_service.generate_analysis_summary(result)
     result["ai"] = ai_result
     history_service.add_entry(current_user.email, result)
+    # Ensure summary reflects the final numeric score and indicators
+    indicators = [i.get("detail") for i in result.get("indicators", [])]
+    result["summary"] = f"Puntuación de riesgo: {result.get('score', 0)}/100. Indicadores: {', '.join(indicators)}"
     return result
 
 
@@ -112,12 +124,20 @@ def analyze_guest(payload: EmailAnalysisRequest):
     result = analyzer.analyze(payload.raw_email)
     if payload.subject:
         result["subject"] = payload.subject
+    if getattr(payload, 'from_', None):
+        result["from"] = payload.from_
     if payload.has_attachment:
-        result["score"] = min(100, (result.get("score") or 0) + 10)
+        result["score"] = min(100, (result.get("score") or 0) + 20)
         score = result.get("score", 0)
         result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
+    if payload.has_attachment and any(i.get('type') == 'credential_request' for i in result.get('indicators', [])):
+        result['risk_level'] = 'high'
+        result['score'] = max(result.get('score', 0), 70)
     ai_result = ai_service.generate_analysis_summary(result)
     result["ai"] = ai_result
+    # Ensure summary reflects the final numeric score and indicators
+    indicators = [i.get("detail") for i in result.get("indicators", [])]
+    result["summary"] = f"Puntuación de riesgo: {result.get('score', 0)}/100. Indicadores: {', '.join(indicators)}"
     return result
 
 
@@ -127,6 +147,7 @@ def upload_email(
     current_user: Annotated[User, Depends(get_current_user)],
     subject: Optional[str] = Form(None),
     has_attachment: bool = Form(False),
+    from_addr: Optional[str] = Form(None),
 ):
     if analyzer is None or ai_service is None or history_service is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Analysis service unavailable")
@@ -137,13 +158,21 @@ def upload_email(
     result = analyzer.analyze(content)
     if subject:
         result["subject"] = subject
+    if from_addr:
+        result["from"] = from_addr
     if has_attachment:
-        result["score"] = min(100, (result.get("score") or 0) + 10)
+        result["score"] = min(100, (result.get("score") or 0) + 20)
         score = result.get("score", 0)
         result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
+    if has_attachment and any(i.get('type') == 'credential_request' for i in result.get('indicators', [])):
+        result['risk_level'] = 'high'
+        result['score'] = max(result.get('score', 0), 70)
     ai_result = ai_service.generate_analysis_summary(result)
     result["ai"] = ai_result
     history_service.add_entry(current_user.email, result)
+    # Ensure summary reflects the final numeric score and indicators
+    indicators = [i.get("detail") for i in result.get("indicators", [])]
+    result["summary"] = f"Puntuación de riesgo: {result.get('score', 0)}/100. Indicadores: {', '.join(indicators)}"
     return result
 
 
@@ -152,6 +181,7 @@ def upload_guest(
     file: Annotated[UploadFile, File(...)],
     subject: Optional[str] = Form(None),
     has_attachment: bool = Form(False),
+    from_addr: Optional[str] = Form(None),
 ):
     if analyzer is None or ai_service is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Analysis service unavailable")
@@ -162,12 +192,20 @@ def upload_guest(
     result = analyzer.analyze(content)
     if subject:
         result["subject"] = subject
+    if from_addr:
+        result["from"] = from_addr
     if has_attachment:
-        result["score"] = min(100, (result.get("score") or 0) + 10)
+        result["score"] = min(100, (result.get("score") or 0) + 20)
         score = result.get("score", 0)
         result["risk_level"] = "high" if score >= 70 else ("medium" if score >= 30 else "low")
+    if has_attachment and any(i.get('type') == 'credential_request' for i in result.get('indicators', [])):
+        result['risk_level'] = 'high'
+        result['score'] = max(result.get('score', 0), 70)
     ai_result = ai_service.generate_analysis_summary(result)
     result["ai"] = ai_result
+    # Ensure summary reflects the final numeric score and indicators
+    indicators = [i.get("detail") for i in result.get("indicators", [])]
+    result["summary"] = f"Puntuación de riesgo: {result.get('score', 0)}/100. Indicadores: {', '.join(indicators)}"
     return result
 
 
